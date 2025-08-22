@@ -552,6 +552,17 @@
         overflow: hidden;
         transition: background-image 0.5s ease-in-out;
     }
+    
+    #posterContent [contenteditable] {
+        outline: 1px dashed rgba(255, 255, 255, 0.5);
+        cursor: text;
+        transition: outline 0.2s ease;
+    }
+     #posterContent [contenteditable]:focus {
+        outline: 2px solid var(--accent-color-dash);
+        background-color: rgba(0,0,0,0.2);
+    }
+
 
     #posterContent::before {
         content: '';
@@ -1145,6 +1156,10 @@
             <button class="actionBtn" style="padding: 4px 8px; font-size: 0.8em; flex-grow: 0;" onclick="changePosterBackground('https://raw.githubusercontent.com/Anandkhuman/housie/main/bg17.jpg')">BG 17</button>
         </div>
 
+        <p style="text-align: center; color: var(--muted-color-dash); font-style: italic; margin-bottom: 10px;">
+            <i class="fas fa-info-circle"></i> Click on any text below to edit it directly.
+        </p>
+        
         <div id="posterContent">
             <!-- Poster content will be generated here by JS -->
         </div>
@@ -1570,8 +1585,14 @@ function updateTicketRelatedUIs() {
     renderVisualTicketBookingPage();
     renderSheetWiseBookedList();
     if (document.getElementById('ticketDisplayArea').innerHTML) searchTicketPublic();
-    if (currentUserRole === 'admin') updateAdminList();
-    if (currentUserRole === 'agent') showAgentSoldTickets();
+    if (currentUserRole === 'admin') {
+        updateAdminList();
+        updateBusinessInfo(); // Update admin info when tickets change
+    }
+    if (currentUserRole === 'agent') {
+        showAgentSoldTickets();
+        updateAgentInfoUI(); // Update agent info when tickets change
+    }
     updateDashboardBookingPopup();
     if (document.getElementById('publicBookingPopup').classList.contains('active')) {
         renderPublicBookingGrid(); 
@@ -2472,8 +2493,14 @@ async function showPreviousGameWinners() {
 }
 
 function updateBusinessInfo() {
+    // This function is now only for the Admin dashboard.
+    if (currentView !== 'adminDashboardView') return;
+    
+    const totalTickets = gameSettingsData.totalTickets || 0;
     const soldTickets = allTicketsData.filter(t => t.is_sold);
     const soldCount = soldTickets.length;
+    const leftCount = totalTickets - soldCount;
+    
     const price = gameSettingsData.ticketPrice || 0;
     const commission = gameSettingsData.agentCommission || 0;
     
@@ -2488,10 +2515,11 @@ function updateBusinessInfo() {
     const netProfit = totalRevenue - totalCommission - totalPrizeMoney;
 
     const adminTable = document.getElementById('businessInfoTable');
-    if(adminTable && currentView === 'adminDashboardView') {
+    if(adminTable) {
         adminTable.innerHTML = `<tbody>
-            <tr><td>Total Tickets</td><td>${gameSettingsData.totalTickets || 0}</td></tr>
+            <tr><td>Total Tickets</td><td>${totalTickets}</td></tr>
             <tr><td>Tickets Sold</td><td>${soldCount}</td></tr>
+            <tr><td>Tickets Left</td><td>${leftCount}</td></tr>
             <tr><td>Total Revenue</td><td>₹ ${totalRevenue.toLocaleString()}</td></tr>
             <tr><td>Total Agent Commission</td><td>₹ ${totalCommission.toLocaleString()}</td></tr>
             <tr><td>Total Prize Money</td><td>₹ ${totalPrizeMoney.toLocaleString()}</td></tr>
@@ -2755,16 +2783,16 @@ function showPosterModal() {
         gameTimeFormatted = date.toLocaleString('en-US', { weekday: 'long', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
     }
 
-    const dividendNamesHTML = activeDividends.map(d => `<p>${d.name}</p>`).join('');
-    const dividendAmountsHTML = activeDividends.map(d => `<p>Rs ${d.amount.toLocaleString()}</p>`).join('');
+    const dividendNamesHTML = activeDividends.map(d => `<p contenteditable="true">${d.name}</p>`).join('');
+    const dividendAmountsHTML = activeDividends.map(d => `<p contenteditable="true">Rs ${d.amount.toLocaleString()}</p>`).join('');
 
     const posterHTML = `
-        <h1 class="poster-title">${title}</h1>
-        <p class="poster-datetime">${gameTimeFormatted}</p>
-        <p class="poster-tagline">Grab Your Tickets & Get Ready to Win!</p>
+        <h1 class="poster-title" contenteditable="true">${title}</h1>
+        <p class="poster-datetime" contenteditable="true">${gameTimeFormatted}</p>
+        <p class="poster-tagline" contenteditable="true">Grab Your Tickets & Get Ready to Win!</p>
 
         <div class="prize-section">
-            <h3>PRIZES</h3>
+            <h3 contenteditable="true">PRIZES</h3>
             <div class="prize-list">
                 <div class="prize-column" id="prize-names">
                     ${dividendNamesHTML}
@@ -2775,11 +2803,11 @@ function showPosterModal() {
             </div>
         </div>
 
-        <p class="ticket-details">Get ticket @ Rs ${ticketPrice}. Total tickets only (${totalTickets})</p>
+        <p class="ticket-details" contenteditable="true">Get ticket @ Rs ${ticketPrice}. Total tickets only (${totalTickets})</p>
 
         <div class="contact-section">
-            <p>visit: <a href="${websiteLink}" target="_blank">${websiteLink.replace(/^https?:\/\//, '')}</a></p>
-            <p>Whatsapp: <span>${adminPhone}</span></p>
+            <p><span contenteditable="true">visit: </span><a href="${websiteLink}" target="_blank">${websiteLink.replace(/^https?:\/\//, '')}</a></p>
+            <p><span contenteditable="true">Whatsapp: </span><span contenteditable="true">${adminPhone}</span></p>
         </div>
     `;
 
@@ -2855,17 +2883,25 @@ async function sharePoster() {
 
 function updateAgentInfoUI() {
     if (!currentUser || currentView !== 'agentDashboardView') return;
+    
     const agentData = allUsersData.find(u => u.uid === currentUser.uid);
     if (agentData) {
         document.getElementById('agentNameInp').value = agentData.name;
         document.getElementById('agentPhoneInp').value = agentData.phone;
     }
+
     const mySoldTickets = allTicketsData.filter(t => t.agent_uid === currentUser.uid);
-    const myEarnings = mySoldTickets.length * (gameSettingsData.agentCommission || 0);
+    const mySoldCount = mySoldTickets.length;
+    const myEarnings = mySoldCount * (gameSettingsData.agentCommission || 0);
     document.getElementById('earningBtn').textContent = `₹ ${myEarnings.toLocaleString()}`;
 
+    const totalTickets = gameSettingsData.totalTickets || 0;
+    const totalSoldCount = allTicketsData.filter(t => t.is_sold).length;
+    const totalLeftCount = totalTickets - totalSoldCount;
+
     document.getElementById('agentBusinessInfoTable').innerHTML = `<tbody>
-        <tr><td>Game Title</td><td>Sintha Team</td></tr>
+        <tr><td>My Tickets Sold</td><td>${mySoldCount}</td></tr>
+        <tr><td>Total Tickets Left (Game)</td><td>${totalLeftCount}</td></tr>
         <tr><td>Ticket Price</td><td>₹ ${(gameSettingsData.ticketPrice || 0).toLocaleString()}</td></tr>
         <tr><td>My Commission/Tkt</td><td>₹ ${(gameSettingsData.agentCommission || 0).toLocaleString()}</td></tr>
     </tbody>`;
@@ -3734,8 +3770,3 @@ document.addEventListener('DOMContentLoaded', () => {
 
 </body>
 </html>
-
-
-
-
-
