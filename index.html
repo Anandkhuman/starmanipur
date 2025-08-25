@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>sinthahousie</title>
+    <title>StarManipur Housie</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -772,7 +772,7 @@
         <header class="main-header">
             <div class="title-container">
                 <div class="logo-container"><i class="fas fa-ticket-alt"></i></div>
-                <h1 class="webTitle">Sintha Team</h1>
+                <h1 class="webTitle">StarManipur Housie</h1>
             </div>
             <div class="icon-bar" id="public-icon-bar">
                 <a href="#" id="whatsappGroupLink" target="_blank" class="icon-btn"><i class="fab fa-whatsapp"></i><span>Join Group</span></a>
@@ -833,7 +833,7 @@
         <header class="main-header">
              <div class="title-container">
                 <div class="logo-container"><i class="fas fa-ticket-alt"></i></div>
-                <h1 class="webTitle">Sintha Team</h1>
+                <h1 class="webTitle">StarManipur Housie</h1>
             </div>
              <div class="icon-bar" id="booking-icon-bar">
                 <a href="#game" id="navigateToGame" class="icon-btn"><i class="fas fa-gamepad"></i><span>Game Board</span></a>
@@ -1206,14 +1206,14 @@
 </div>
 <script>
 const firebaseConfig = {
-  apiKey: "AIzaSyB2imEIvh_bWbYD_yPB7p3af7bV9OWdA5A",
-  authDomain: "sinthahousie-1dd3b.firebaseapp.com",
-  databaseURL: "https://sinthahousie-1dd3b-default-rtdb.firebaseio.com",
-  projectId: "sinthahousie-1dd3b",
-  storageBucket: "sinthahousie-1dd3b.firebasestorage.app",
-  messagingSenderId: "76567991256",
-  appId: "1:76567991256:web:c58b127b8d86d8a1c598ad",
-  measurementId: "G-MGW406NKBY"
+  apiKey: "AIzaSyApvntOlIQWNYa9IpVFrZbML9ajnCQn-io",
+  authDomain: "starmanipurhousie.firebaseapp.com",
+  databaseURL: "https://starmanipurhousie-default-rtdb.firebaseio.com",
+  projectId: "starmanipurhousie",
+  storageBucket: "starmanipurhousie.firebasestorage.app",
+  messagingSenderId: "872393220764",
+  appId: "1:872393220764:web:342abee11ff703575ac359",
+  measurementId: "G-DBDKY4HF3N"
 };
 
 firebase.initializeApp(firebaseConfig);
@@ -2836,7 +2836,7 @@ function changePosterBackground(source) {
 }
 
 function showPosterModal() {
-    const title = "SINTHA TEAM HOUSIE";
+    const title = "StarManipur Housie";
     const gameDateTime = gameSettingsData.gameDateTime;
     const ticketPrice = gameSettingsData.ticketPrice || 'N/A';
     const totalTickets = gameSettingsData.totalTickets || 'N/A';
@@ -3319,32 +3319,26 @@ function checkAllWinners(calledNumbers, currentWinners) {
     const soldTickets = allTicketsData.filter(t => t.is_sold);
     const lastCalledNumber = calledNumbers[calledNumbers.length - 1];
     
-    // Helper to check if an array of numbers has been called
     const check = (numbers) => numbers.every(n => calledNumbers.includes(n));
-    // Helper to count how many numbers on a ticket have been called
     const countMarked = (ticket) => ticket.numbers.flat().filter(n => n > 0 && calledNumbers.includes(n)).length;
 
-    // Group tickets by owner for sheet-based dividend checks
-    const ticketsByOwner = {};
-    for (const ticket of soldTickets) {
+    const ticketsByOwner = soldTickets.reduce((acc, ticket) => {
         if (ticket.owner_phone) {
-            if (!ticketsByOwner[ticket.owner_phone]) ticketsByOwner[ticket.owner_phone] = [];
-            ticketsByOwner[ticket.owner_phone].push(ticket);
+            if (!acc[ticket.owner_phone]) acc[ticket.owner_phone] = [];
+            acc[ticket.owner_phone].push(ticket);
         }
-    }
+        return acc;
+    }, {});
 
     for (const dividend of activeDividends) {
-        // Skip if this dividend has already been won
         if (updatedWinners[dividend.name]) continue;
 
         let winnersThisTurn = [];
-        let winningPatternNumbers = [];
-
+        
         // --- Sheet Based Dividends ---
         if (dividend.name === 'Full Sheet Bonus' || dividend.name === 'Half Sheet Bonus') {
             for (const ownerPhone in ticketsByOwner) {
                 const ownerTickets = ticketsByOwner[ownerPhone];
-                // Group this owner's tickets by their sheet number
                 const ticketsBySheet = ownerTickets.reduce((acc, ticket) => {
                     const sheetNum = Math.floor((ticket.id - 1) / 6);
                     if (!acc[sheetNum]) acc[sheetNum] = [];
@@ -3356,32 +3350,20 @@ function checkAllWinners(calledNumbers, currentWinners) {
                     const sheetTickets = ticketsBySheet[sheetNum];
                     
                     if (dividend.name === 'Full Sheet Bonus' && sheetTickets.length === 6) {
-                        const allTicketsMeetCondition = sheetTickets.every(t => countMarked(t) >= 2);
+                        const allMeetCondition = sheetTickets.every(t => countMarked(t) >= 2);
                         const isWinningCall = sheetTickets.some(t => t.numbers.flat().includes(lastCalledNumber));
-
-                        if (allTicketsMeetCondition && isWinningCall) {
-                             winnersThisTurn.push({
-                                name: ownerTickets[0].owner_name, phone: ownerPhone,
-                                ticketId: `Sheet ${parseInt(sheetNum) + 1}`, winningNumber: lastCalledNumber,
-                                won_at: firebase.database.ServerValue.TIMESTAMP, dividendName: dividend.name
-                            });
+                        if (allMeetCondition && isWinningCall) {
+                             winnersThisTurn.push({ name: ownerTickets[0].owner_name, phone: ownerPhone, ticketId: `Sheet ${parseInt(sheetNum) + 1}`, winningNumber: lastCalledNumber, won_at: firebase.database.ServerValue.TIMESTAMP, dividendName: dividend.name });
                         }
                     } else if (dividend.name === 'Half Sheet Bonus' && sheetTickets.length >= 3) {
-                        // Check all combinations of 3 tickets within the sheet
-                        for (let i = 0; i < sheetTickets.length - 2; i++) {
+                         for (let i = 0; i < sheetTickets.length - 2; i++) {
                             for (let j = i + 1; j < sheetTickets.length - 1; j++) {
                                 for (let k = j + 1; k < sheetTickets.length; k++) {
                                     const combo = [sheetTickets[i], sheetTickets[j], sheetTickets[k]];
-                                    const allTicketsMeetCondition = combo.every(t => countMarked(t) >= 2);
+                                    const allMeetCondition = combo.every(t => countMarked(t) >= 2);
                                     const isWinningCall = combo.some(t => t.numbers.flat().includes(lastCalledNumber));
-
-                                    if(allTicketsMeetCondition && isWinningCall){
-                                        winnersThisTurn.push({
-                                            name: ownerTickets[0].owner_name, phone: ownerPhone,
-                                            ticketId: `Half Sheet in Sheet ${parseInt(sheetNum) + 1}`, winningNumber: lastCalledNumber,
-                                            won_at: firebase.database.ServerValue.TIMESTAMP, dividendName: dividend.name
-                                        });
-                                        // Found a winning combo, no need to check more for this owner/sheet
+                                    if(allMeetCondition && isWinningCall){
+                                        winnersThisTurn.push({ name: ownerTickets[0].owner_name, phone: ownerPhone, ticketId: `Half Sheet in Sheet ${parseInt(sheetNum) + 1}`, winningNumber: lastCalledNumber, won_at: firebase.database.ServerValue.TIMESTAMP, dividendName: dividend.name });
                                         i = j = k = sheetTickets.length; 
                                     }
                                 }
@@ -3395,6 +3377,7 @@ function checkAllWinners(calledNumbers, currentWinners) {
         else {
              for (const ticket of soldTickets) {
                 let isWinner = false;
+                let winningPatternNumbers = [];
                 const checkPattern = (numbers) => {
                     winningPatternNumbers = numbers;
                     return check(numbers);
@@ -3405,13 +3388,12 @@ function checkAllWinners(calledNumbers, currentWinners) {
                 if (dividend.name.includes("Full House")) {
                     const housefullWinnersData = Object.values(updatedWinners).flat().filter(w => w.dividendName && w.dividendName.includes("Full House"));
                     const housefullWinnerTicketIds = housefullWinnersData.map(w => w.ticketId);
-                    const fullHouseClaimedCount = new Set(housefullWinnerTicketIds).size;
                     const allTicketNumbers = ticket.numbers.flat().filter(n => n > 0);
-                    
                     if (checkPattern(allTicketNumbers) && !housefullWinnerTicketIds.includes(ticket.id)) {
-                        if ((dividend.name === "First Full House" && fullHouseClaimedCount === 0) ||
-                            (dividend.name === "Second Full House" && fullHouseClaimedCount === 1) ||
-                            (dividend.name === "Third Full House" && fullHouseClaimedCount === 2)) {
+                        const claimedCount = new Set(housefullWinnerTicketIds).size;
+                        if ((dividend.name === "First Full House" && claimedCount === 0) ||
+                            (dividend.name === "Second Full House" && claimedCount === 1) ||
+                            (dividend.name === "Third Full House" && claimedCount === 2)) {
                             isWinner = true;
                         }
                     }
@@ -3422,7 +3404,14 @@ function checkAllWinners(calledNumbers, currentWinners) {
                 else if (dividend.name === "Corners (4)") {
                     const corners = [r1[0], r1[r1.length - 1], r3[0], r3[r3.length - 1]].filter(Boolean);
                     if (corners.length === 4 && checkPattern(corners)) isWinner = true;
-                } else if (dividend.name.startsWith("Early") || dividend.name.startsWith("Quick")) {
+                } else if (dividend.name === "Star") {
+                    const midNumR2 = r2.length === 5 ? r2[2] : null; // Star is only for tickets with 5 numbers in middle line.
+                    if (r1.length === 5 && midNumR2 && r3.length === 5) {
+                        const starNumbers = [r1[0], r1[4], midNumR2, r3[0], r3[4]].filter(Boolean);
+                        if(starNumbers.length === 5 && checkPattern(starNumbers)) isWinner = true;
+                    }
+                }
+                else if (dividend.name.startsWith("Early") || dividend.name.startsWith("Quick")) {
                     const count = parseInt(dividend.name.match(/\d+/)[0], 10);
                     if (countMarked(ticket) >= count) {
                         isWinner = true;
@@ -3431,10 +3420,7 @@ function checkAllWinners(calledNumbers, currentWinners) {
                 }
 
                 if (isWinner && winningPatternNumbers.includes(lastCalledNumber)) {
-                    winnersThisTurn.push({
-                        name: ticket.owner_name, phone: ticket.owner_phone, ticketId: ticket.id,
-                        winningNumber: lastCalledNumber, won_at: firebase.database.ServerValue.TIMESTAMP, dividendName: dividend.name
-                    });
+                    winnersThisTurn.push({ name: ticket.owner_name, phone: ticket.owner_phone, ticketId: ticket.id, winningNumber: lastCalledNumber, won_at: firebase.database.ServerValue.TIMESTAMP, dividendName: dividend.name });
                 }
             }
         }
