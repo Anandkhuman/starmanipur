@@ -1,10 +1,9 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>StarManipur Housie</title>
+    <title>StarManipur</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -31,7 +30,7 @@
         --text-primary: #ffffff;
         --text-secondary: #b0a8e0;
         --text-dark: #100c2A;
-        --font-family-neon: 'Rajdhani', sans-serif;
+        --font-family-neon: 'Roboto', sans-serif;
         --transition-speed: 0.4s;
         --transition-ease: cubic-bezier(0.25, 0.46, 0.45, 0.94);
         --primary-bg-dash: #2c3e50; /* Wet Asphalt */
@@ -367,7 +366,7 @@
 
     /* Professional Dividend List */
     .dividend-table { width: 100%; border-collapse: collapse; }
-    .dividend-table th, .dividend-table td { padding: 0.8rem; text-align: left; border-bottom: 1px solid rgba(255, 0, 160, 0.4); font-size: 0.9rem; vertical-align: top; }
+    .dividend-table th, .dividend-table td { padding: 0.8rem; text-align: left; border-top: 1px solid rgba(255, 0, 160, 0.4); font-size: 0.9rem; vertical-align: top; }
     .dividend-table th { font-weight: 700; color: var(--accent-secondary); font-size: 0.95rem; }
     .dividend-table tbody tr { transition: background-color var(--transition-speed) ease; }
     .dividend-table tbody tr:hover { background-color: rgba(255, 0, 160, 0.1); }
@@ -1131,7 +1130,7 @@
                 </tr>
             </tbody>
         </table>
-        
+       
         <section class="panel" style="background: var(--secondary-bg-dash); width: 95%; margin: 1rem auto; border-color: var(--accent-color-dash);">
             <h2 class="panel-title" style="color: var(--light-text-dash); text-shadow: none; font-size: 1.2rem;">GAME BOARD</h2>
             <div class="number-board" id="runGamePopupBoard">
@@ -1244,6 +1243,7 @@ let countdownInterval = null;
 let gameRunnerInterval = null;
 let gameLiveSoundPlayed = false; 
 let knownWinners = {};
+let isInitialWinnerLoad = true;
 let ticketIdToEdit = null;
 let originalOwnerInfo = { name: '', phone: '' }; 
 let ticketToDeleteInfo = {};
@@ -1527,21 +1527,36 @@ function setupRealtimeListeners() {
         currentCalledNumbers = newNumbers;
 
         const newWinners = data.winners || {};
-        for (const dividendName in newWinners) {
-             if (!knownWinners[dividendName]) {
-                const winnerArray = newWinners[dividendName];
-                if (Array.isArray(winnerArray)) {
-                    const winnerNames = winnerArray.map(w => `${w.name} (Tkt: ${w.ticketId})`).join(', ');
+
+        if (isInitialWinnerLoad) {
+            // On the very first data load, just populate the known state.
+            // This prevents a storm of notifications on page refresh.
+            knownWinners = newWinners;
+            isInitialWinnerLoad = false;
+        } else {
+            // For all subsequent updates, check for *new* winners compared to the known state.
+            for (const dividendName in newWinners) {
+                const newWinnerArray = newWinners[dividendName] || [];
+                const oldWinnerArray = knownWinners[dividendName] || [];
+
+                const oldWinnerTicketIds = new Set(oldWinnerArray.map(w => w.ticketId));
+                const justAnnouncedWinners = newWinnerArray.filter(w => !oldWinnerTicketIds.has(w.ticketId));
+
+                if (justAnnouncedWinners.length > 0) {
+                    const winnerNames = justAnnouncedWinners.map(w => `${w.name} (Tkt: ${w.ticketId})`).join(', ');
                     const msg = `${winnerNames} has won ${dividendName}!`;
+                    
                     triggerGlobalNotification(msg, 'success');
+                    
                     const soundFile = dividendSoundMap[dividendName];
                     if (soundFile) {
                         playSound(audioBaseUrl + soundFile);
                     }
                 }
             }
+            // After checking, update the known state for the next update.
+            knownWinners = newWinners;
         }
-        knownWinners = newWinners;
 
         updateGameRelatedUIs(data); 
     }, err => { console.error("GameState listener error:", err); showNotification('Could not load game state.', 'error'); });
@@ -2802,7 +2817,7 @@ function changePosterBackground(source) {
 }
 
 function showPosterModal() {
-    const title = "StarManipur Housie";
+    const title = "StarManipur Housie ";
     const gameDateTime = gameSettingsData.gameDateTime;
     const ticketPrice = gameSettingsData.ticketPrice || 'N/A';
     const totalTickets = gameSettingsData.totalTickets || 'N/A';
@@ -3340,10 +3355,12 @@ function checkAllWinners(calledNumbers, currentWinners) {
                     const allTicketNumbers = r1.concat(r2, r3);
 
                     if (checkPattern(allTicketNumbers) && !housefullWinnerTicketIds.includes(ticket.id)) {
-                        const claimedCount = new Set(housefullWinnerTicketIds).size;
-                        if ((dividend.name === "First Full House" && claimedCount === 0) ||
-                            (dividend.name === "Second Full House" && claimedCount === 1) ||
-                            (dividend.name === "Third Full House" && claimedCount === 2)) {
+                        // **FIXED LOGIC**: Count claimed prize categories, not winning tickets.
+                        const claimedPrizesCount = Object.keys(updatedWinners).filter(key => key.includes("Full House")).length;
+                        
+                        if ((dividend.name === "First Full House" && claimedPrizesCount === 0) ||
+                            (dividend.name === "Second Full House" && claimedPrizesCount === 1) ||
+                            (dividend.name === "Third Full House" && claimedPrizesCount === 2)) {
                             isWinner = true;
                         }
                     }
@@ -3351,7 +3368,7 @@ function checkAllWinners(calledNumbers, currentWinners) {
                 default:
                     if (dividend.name.startsWith("Early") || dividend.name.startsWith("Quick")) {
                         const count = parseInt(dividend.name.match(/\d+/)[0], 10);
-                        if (countMarked(ticket) >= count) {
+                        if (countMarked(ticket) === count) {
                             isWinner = true;
                             winningPatternNumbers = ticket.numbers.flat().filter(n => n > 0 && calledNumbers.includes(n)).slice(0, count);
                         }
@@ -3404,6 +3421,7 @@ function checkAllWinners(calledNumbers, currentWinners) {
     }
     return updatedWinners;
 }
+
 
 async function generateHousieTickets(bypassConfirm = false) {
     const totalTicketsStr = document.getElementById('totalTicketInp').value;
