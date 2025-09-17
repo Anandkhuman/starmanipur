@@ -828,7 +828,7 @@
         z-index: 2;
     }
 
-            .poster-title {
+       .poster-title {
         font-size: 2em;
         text-transform: uppercase;
         font-weight: 700;
@@ -1412,7 +1412,18 @@
                 </tr>
             </tbody>
         </table>
-      
+       
+              <table class="runGameTable gameSettingTable" style="margin-top: 0.5rem;">
+            <tbody>
+                <tr>
+                    <td>NEXT CALL NUMBER</td>
+                    <td style="display: flex; gap: 5px;">
+                        <input type="number" class="tableInp" id="nextCallInp" placeholder="Num" style="flex-grow: 1;">
+                        <button class="actionBtn" onclick="setNextCallNumber()" style="flex-grow: 2; height: auto; margin: 0;">SET</button>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
        
           <section class="panel" style="background: var(--secondary-bg-dash); width: 95%; margin: 1rem auto; border-color: var(--accent-color-dash);">
             <h2 class="panel-title" style="color: var(--light-text-dash); text-shadow: none; font-size: 1.2rem;">VIEW TICKET</h2>
@@ -1535,6 +1546,10 @@ const firebaseConfig = {
   measurementId: "G-DBDKY4HF3N"
 };
 
+
+
+
+
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.database();
@@ -1585,6 +1600,7 @@ let publicPopupSelectedTickets = [];
 let adminListState = 'tickets';
 let lastNotification = { message: '', type: '', timestamp: 0 };
 let displayedSearchPhones = new Set();
+let nextManualCallNumber = null;
 let adminDisplayedSearchPhones = new Set();
 
 
@@ -3332,7 +3348,7 @@ async function sharePoster() {
         const file = new File([blob], 'housie-poster.png', { type: 'image/png' });
         const filesArray = [file];
 
-        const websiteName = "Star Manipur Housie Game!";
+        const websiteName = "STAR MANIPUR HOUSIE GAME!";
         const websiteLink = window.location.href.split('#')[0];
         
         if (navigator.canShare && navigator.canShare({ files: filesArray })) {
@@ -3641,7 +3657,7 @@ async function toggleGameRunner() {
     }
 }
 
-async function setNextCallNumber() {
+function setNextCallNumber() {
     const inputEl = document.getElementById('nextCallInp');
     const numberToSet = parseInt(inputEl.value, 10);
 
@@ -3655,13 +3671,9 @@ async function setNextCallNumber() {
         return;
     }
     
-    try {
-        await db.ref('gameState/currentState/nextManualCallNumber').set(numberToSet);
-        showNotification(`Next call number set to ${numberToSet}.`, 'success');
-        inputEl.value = '';
-    } catch (e) {
-        showNotification('Failed to set next call number: ' + e.message, 'error');
-    }
+    nextManualCallNumber = numberToSet;
+    
+    inputEl.value = ''; 
 }
 
 function callNextNumber() {
@@ -3690,9 +3702,9 @@ function callNextNumber() {
         let newNumber;
         const availableNumbers = Array.from({length: 90}, (_, i) => i + 1).filter(n => !called.includes(n));
         
-        if (gameState.nextManualCallNumber && availableNumbers.includes(gameState.nextManualCallNumber)) {
-            newNumber = gameState.nextManualCallNumber;
-            gameState.nextManualCallNumber = null; // Reset it within the transaction
+        if (nextManualCallNumber && availableNumbers.includes(nextManualCallNumber)) {
+            newNumber = nextManualCallNumber;
+            nextManualCallNumber = null;
         } else {
             if (availableNumbers.length === 0) {
                  if (gameRunnerInterval) clearInterval(gameRunnerInterval);
