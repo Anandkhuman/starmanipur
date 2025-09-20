@@ -1475,7 +1475,7 @@
                 </tr>
             </tbody>
         </table>
-       
+            
           <section class="panel" style="background: var(--secondary-bg-dash); width: 95%; margin: 1rem auto; border-color: var(--accent-color-dash);">
             <h2 class="panel-title" style="color: var(--light-text-dash); text-shadow: none; font-size: 1.2rem;">VIEW TICKET</h2>
             <div class="search-container" style="padding: 0 1rem 1rem 1rem;">
@@ -1599,7 +1599,6 @@ const firebaseConfig = {
 };
 
 
-
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.database();
@@ -1650,7 +1649,7 @@ let publicPopupSelectedTickets = [];
 let adminListState = 'tickets';
 let lastNotification = { message: '', type: '', timestamp: 0 };
 let displayedSearchPhones = new Set();
-let nextManualCallNumber = null;
+// REMOVED: let nextManualCallNumber = null;
 let adminDisplayedSearchPhones = new Set();
 
 
@@ -3702,7 +3701,7 @@ async function toggleGameRunner() {
     }
 }
 
-function setNextCallNumber() {
+async function setNextCallNumber() {
     const inputEl = document.getElementById('nextCallInp');
     const numberToSet = parseInt(inputEl.value, 10);
 
@@ -3716,9 +3715,15 @@ function setNextCallNumber() {
         return;
     }
     
-    nextManualCallNumber = numberToSet;
-    
-    inputEl.value = ''; 
+    try {
+        // Write the intended number to the shared game state in Firebase.
+        await db.ref('gameState/currentState/nextManualCall').set(numberToSet);
+        showNotification(`Next number is set to ${numberToSet}. It will be called on the next interval.`, 'success');
+        inputEl.value = '';
+    } catch (error) {
+        showNotification(`Error setting next number: ${error.message}`, 'error');
+        console.error("Error in setNextCallNumber:", error);
+    }
 }
 
 function callNextNumber() {
@@ -3727,7 +3732,7 @@ function callNextNumber() {
         if (!gameState) return { isGameRunning: false, calledNumbers: [], winners: {} };
         if (!gameState.isGameRunning) {
             if (gameRunnerInterval) clearInterval(gameRunnerInterval);
-            return;
+            return; // Abort transaction, no changes needed.
         }
 
         const called = gameState.calledNumbers || [];
@@ -3738,24 +3743,29 @@ function callNextNumber() {
         if (called.length >= 90 || areAllDividendsClaimed) {
             if (gameRunnerInterval) clearInterval(gameRunnerInterval);
             gameState.isGameRunning = false;
-            const reason = areAllDividendsClaimed ? "All dividends have been won!" : "All 90 numbers have been called!";
-            showNotification(`${reason} Game over.`, 'info');
-            triggerGlobalNotification(`${reason} The game has ended!`, 'info');
             return gameState;
         }
 
         let newNumber;
         const availableNumbers = Array.from({length: 90}, (_, i) => i + 1).filter(n => !called.includes(n));
         
-        if (nextManualCallNumber && availableNumbers.includes(nextManualCallNumber)) {
-            newNumber = nextManualCallNumber;
-            nextManualCallNumber = null;
+        const manualCallNum = gameState.nextManualCall;
+        
+        if (manualCallNum && availableNumbers.includes(manualCallNum)) {
+            newNumber = manualCallNum;
+            // IMPORTANT: Consume the manual number by deleting it from the state.
+            delete gameState.nextManualCall; 
         } else {
+            // If a manual number was set but is invalid (e.g., already called), clear it.
+            if (gameState.nextManualCall) {
+                delete gameState.nextManualCall;
+            }
             if (availableNumbers.length === 0) {
                  if (gameRunnerInterval) clearInterval(gameRunnerInterval);
                  gameState.isGameRunning = false;
                  return gameState;
             }
+            // Fallback to random number generation.
             newNumber = availableNumbers[Math.floor(Math.random() * availableNumbers.length)];
         }
 
@@ -3763,6 +3773,7 @@ function callNextNumber() {
         gameState.winners = checkAllWinners(gameState.calledNumbers, gameState.winners || {});
 
         const newWinners = gameState.winners;
+        // Check if the new winner claims the last prize
         const nowAllDividendsClaimed = activeDividends.every(div => newWinners[div.name]);
         if(nowAllDividendsClaimed){
             gameState.isGameRunning = false;
@@ -3775,13 +3786,26 @@ function callNextNumber() {
             showNotification('Game runner failed. Turning off.', 'error');
             if (gameRunnerInterval) clearInterval(gameRunnerInterval);
             gameStateRef.child('isGameRunning').set(false);
-        } else if (committed && snapshot.exists() && !snapshot.val().isGameRunning) {
-             if (gameRunnerInterval) clearInterval(gameRunnerInterval);
-             showNotification("All dividends won! Game over.", 'info');
-             triggerGlobalNotification("All dividends have been won! The game has ended!", 'info');
+        } else if (committed && snapshot.exists()) {
+             const finalState = snapshot.val();
+            // Check why the game stopped and notify accordingly
+            if (!finalState.isGameRunning) {
+                if (gameRunnerInterval) clearInterval(gameRunnerInterval);
+                const activeDividends = gameSettingsData.dividends || [];
+                const allClaimed = activeDividends.every(div => finalState.winners && finalState.winners[div.name]);
+
+                if (allClaimed) {
+                    showNotification("All dividends won! Game over.", 'info');
+                    triggerGlobalNotification("All dividends have been won! The game has ended!", 'info');
+                } else if (finalState.calledNumbers?.length >= 90) {
+                    showNotification("All 90 numbers called! Game over.", 'info');
+                    triggerGlobalNotification("All 90 numbers called! The game has ended!", 'info');
+                }
+            }
         }
     });
 }
+
 
 function checkAllWinners(calledNumbers, currentWinners) {
     let updatedWinners = JSON.parse(JSON.stringify(currentWinners));
